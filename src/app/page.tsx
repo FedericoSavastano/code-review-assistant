@@ -1,65 +1,220 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useRef } from "react";
+import CodeEditor from "@/components/CodeEditor";
+import AnalysisView from "@/components/AnalysisView";
+import HistorySidebar, {
+  HistorySidebarHandle,
+} from "@/components/HistorySidebar";
+import { Language, LANGUAGES, Analysis, CodeReview } from "@/types";
+import { Code2, Loader2, Sparkles, Menu } from "lucide-react";
 
 export default function Home() {
+  const [code, setCode] = useState("");
+  const [language, setLanguage] = useState<Language>("javascript");
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [currentReviewId, setCurrentReviewId] = useState<string | undefined>();
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(true);
+
+  const sidebarRef = useRef<HistorySidebarHandle>(null);
+
+  const handleAnalyze = async () => {
+    if (!code.trim()) {
+      setError("Por favor, ingresa código para analizar");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setError(null);
+    setAnalysis(null);
+
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, language }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || "Analysis failed");
+      }
+
+      setAnalysis(data.review.analysis);
+      setCurrentReviewId(data.review.id);
+
+      // Refrescar el historial
+      sidebarRef.current?.refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Error al analizar el código",
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleNewReview = () => {
+    setCode("");
+    setAnalysis(null);
+    setError(null);
+    setCurrentReviewId(undefined);
+  };
+
+  const handleSelectReview = async (review: CodeReview) => {
+    try {
+      const response = await fetch(`/api/reviews/${review.id}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setCode(data.review.original_code);
+        setLanguage(data.review.language);
+        setAnalysis(data.review.analysis);
+        setCurrentReviewId(data.review.id);
+      }
+    } catch (error) {
+      console.error("Error loading review:", error);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="flex h-screen w-full overflow-hidden bg-gray-50">
+      {/* Sidebar izquierdo - Historial */}
+      {showHistory && (
+        <HistorySidebar
+          ref={sidebarRef}
+          onSelectReview={handleSelectReview}
+          currentReviewId={currentReviewId}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+      )}
+
+      {/* Contenido principal (derecha) */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200 shadow-sm flex-shrink-0 z-10">
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  title={
+                    showHistory ? "Ocultar historial" : "Mostrar historial"
+                  }
+                >
+                  <Menu className="w-5 h-5 text-gray-600" />
+                </button>
+                <div className="bg-blue-600 p-2 rounded-lg">
+                  <Code2 className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">
+                    Code Review Assistant
+                  </h1>
+                  <p className="text-sm text-gray-600">
+                    Análisis inteligente de código con IA
+                  </p>
+                </div>
+              </div>
+              {analysis && (
+                <button
+                  onClick={handleNewReview}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                >
+                  Nuevo Análisis
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Área de contenido scrolleable */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-5xl mx-auto p-8">
+            <div className="space-y-6">
+              {/* Selector de lenguaje - siempre visible */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lenguaje
+                </label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value as Language)}
+                  className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={isAnalyzing}
+                >
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang.value} value={lang.value}>
+                      {lang.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Editor de código - siempre visible */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <label className="block text-sm font-medium text-gray-700 mb-4">
+                  {analysis ? "Código Analizado" : "Tu Código"}
+                </label>
+                <CodeEditor
+                  value={code}
+                  onChange={setCode}
+                  language={language}
+                  readOnly={isAnalyzing || !!analysis}
+                />
+              </div>
+
+              {/* Mensaje de error */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-red-600 text-sm">{error}</p>
+                </div>
+              )}
+
+              {/* Botón de análisis - solo si no hay análisis */}
+              {!analysis && (
+                <button
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing || !code.trim()}
+                  className="
+            w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium 
+            hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed 
+            transition-all duration-200
+            transform hover:scale-[1.02] active:scale-[0.98]
+            shadow-lg hover:shadow-xl
+            flex items-center justify-center gap-2
+          "
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Analizando código...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5" />
+                      Analizar Código
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Vista de análisis - solo si hay análisis */}
+              {analysis && (
+                <AnalysisView
+                  analysis={analysis}
+                  reviewId={currentReviewId}
+                  originalCode={code}
+                  language={language}
+                />
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
