@@ -8,6 +8,7 @@ import HistorySidebar, {
 } from "@/components/HistorySidebar";
 import { Language, LANGUAGES, Analysis, CodeReview } from "@/types";
 import { Code2, Loader2, Sparkles, Menu } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   const [code, setCode] = useState("");
@@ -213,6 +214,23 @@ export default function Home() {
               )}
             </div>
           </div>
+
+          <footer className="bg-gray-900 text-white py-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+              <p className=" text-sm text-gray-400">
+                © {new Date().getFullYear()} Code Review Assistant. Hecho con
+                ✨por{" "}
+                <Link
+                  href="https://federicosavastano.vercel.app"
+                  className=" text-sm text-gray-100"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Federico Savastano
+                </Link>
+              </p>
+            </div>
+          </footer>
         </div>
       </div>
     </div>
