@@ -9,8 +9,6 @@
 
 [🚀 Live Demo](https://code-review-assistant-federicosavastano.vercel.app/)
 
-![Code Review Assistant Demo](public/demo-screenshot.png)
-
 ---
 
 ## ✨ Features
